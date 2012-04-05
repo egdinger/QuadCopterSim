@@ -9,7 +9,16 @@ class ThreeState:
         def __init__(self):
                 self.x = 0.0
                 self.y = 0.0
+                self.z = 0.0
+
+class quad_state:
+        def __init__(self):
+                self.roll = 0.0
+                self.pitch = 0.0
+                self.yaw = 0.0
+                self.x = 0.0
                 self.y = 0.0
+                self.z = 0.0
 
 #this is the class that models the acceleromter
 #it will model the adxl345
@@ -25,15 +34,15 @@ class accel:
                 state.x = random.gauss(0,1)
                 state.y = random.gauss(0,1)
                 state.z = random.gauss(0,1.5)
-                return [state.x,state.y,state.z]
+                return state
 
         #Returns a three state with the raw (0-1023 values)
         def measure(phys_state):
                 state = accel.noise()
-                state[0] += 0.0
-                state[1] += 0.0
+                state.x += ((gravity*math.cos((math.pi/2)-phys_state.roll))*26.122)+512
+                state.y += 0.0
                 #state[2] += gravity*52.24489 #not sure this is right, the range is +-2g, not 2g,
-                state[2] += (gravity*26.122)+512
+                state.z += ((gravity*math.cos(phys_state.roll))*26.122)+512
                 return state
 
 class QuadCopter:
@@ -45,22 +54,10 @@ class QuadCopter:
 
 	#since python sin uses radins, these are in radians
 	#This is the physical state of the airframe
-	class phys_state:
-		roll = 0.0
-		pitch = 0.0
-		yaw = 0.0
-		x = 0.0
-		y = 0.0
-		z = 0.0
+	phys_state = quad_state()
 
         #this is the state of the airframe reported by the imu
-	class imu_state:
-		roll = 0.0
-		pitch = 0.0
-		yaw = 0.0
-		x = 0.0
-		y = 0.0
-		z = 0.0
+	imu_state = quad_state()
 		
 	def thrust(motor_percent, self):
 		z_thrust = 0.0
@@ -92,5 +89,8 @@ for p in x:
         print (QuadCopter.thrust(z, QuadCopter))
 
 print('------------------------------------------------')
-for i in range(100):
-        print(accel.measure(QuadCopter.phys_state))
+QuadCopter.phys_state.roll = 0
+for i in range(20):
+        f = accel.measure(QuadCopter.phys_state)
+        print (math.sqrt((f.x-512)*(f.x-512)+(f.z-512)*(f.z-512)))
+        print(f.x, f.y, f.z)
