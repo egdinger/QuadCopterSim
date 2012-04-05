@@ -27,13 +27,16 @@ class accel:
         #2g scale
         #noise on z axis =< 1.5lsb
         #noise on x,y axis =<1lsb
+        x_noise = 1
+        y_noise = 1
+        z_noise = 1.5
 
         #Will return a three state with the noise values
         def noise():
                 state = ThreeState ()
-                state.x = random.gauss(0,1)
-                state.y = random.gauss(0,1)
-                state.z = random.gauss(0,1.5)
+                state.x = random.gauss(0,x_noise)
+                state.y = random.gauss(0,y_noise)
+                state.z = random.gauss(0,z_noise)
                 return state
 
         #Returns a three state with the raw (0-1023 values)
