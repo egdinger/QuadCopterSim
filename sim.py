@@ -27,26 +27,38 @@ class accel:
         #2g scale
         #noise on z axis =< 1.5lsb
         #noise on x,y axis =<1lsb
-        x_noise = 1
-        y_noise = 1
-        z_noise = 1.5
+        def __init__(self):
+                self.x_noise = 1
+                self.y_noise = 1
+                self.z_noise = 1.5
+                self.fullscale = 1023
 
         #Will return a three state with the noise values
-        def noise():
+        def noise(self):
                 state = ThreeState ()
-                state.x = random.gauss(0,x_noise)
-                state.y = random.gauss(0,y_noise)
-                state.z = random.gauss(0,z_noise)
+                state.x = random.gauss(0,self.x_noise)
+                state.y = random.gauss(0,self.y_noise)
+                state.z = random.gauss(0,self.z_noise)
                 return state
 
         #Returns a three state with the raw (0-1023 values)
-        def measure(phys_state):
-                state = accel.noise()
+        def measure2(self, phys_state):
+                state = accel.noise(self)
                 state.x += ((gravity*math.cos((math.pi/2)-phys_state.roll))*26.122)+512
-                state.y += 0.0
+                state.y += ((gravity*math.cos((math.pi/2)-phys_state.pitch))*26.122)+512
                 #state[2] += gravity*52.24489 #not sure this is right, the range is +-2g, not 2g,
                 state.z += ((gravity*math.cos(phys_state.roll))*26.122)+512
                 return state
+
+        def measure(self, phys_state):
+                state = accel.noise(self)
+                state.x = (-math.sin(phys_state.x)*gravity)
+                state.y = math.cos(phys_state.x)*math.sin(phys_state.y)*gravity
+                state.z = math.cos(phys_state.x)*math.cos(phys_state.y)*gravity
+                return state
+
+        def scale(self):
+                return self.fullscale
 
 class QuadCopter:
 	#units are grams
@@ -58,6 +70,8 @@ class QuadCopter:
 	#since python sin uses radins, these are in radians
 	#This is the physical state of the airframe
 	phys_state = quad_state()
+
+	setpoint = quad_state()
 
         #this is the state of the airframe reported by the imu
 	imu_state = quad_state()
@@ -92,8 +106,9 @@ for p in x:
         print (QuadCopter.thrust(z, QuadCopter))
 
 print('------------------------------------------------')
+a= accel()
 QuadCopter.phys_state.roll = 0
 for i in range(20):
-        f = accel.measure(QuadCopter.phys_state)
+        f = a.measure(QuadCopter.phys_state)
         print (math.sqrt((f.x-512)*(f.x-512)+(f.z-512)*(f.z-512)))
         print(f.x, f.y, f.z)
