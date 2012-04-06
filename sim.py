@@ -2,6 +2,7 @@
 #this time
 import math
 import random
+import pdb
 
 gravity = 9.8 #the usual m/s^2
 
@@ -35,10 +36,11 @@ class accel:
 
         #Will return a three state with the noise values
         def noise(self):
+                #pdb.set_trace()
                 state = ThreeState ()
-                #state.x = random.gauss(0,self.x_noise)
-                #state.y = random.gauss(0,self.y_noise)
-                #state.z = random.gauss(0,self.z_noise)
+                state.x = random.gauss(0,self.x_noise)
+                state.y = random.gauss(0,self.y_noise)
+                state.z = random.gauss(0,self.z_noise)
                 return state
 
         #Returns a three state with the raw (0-1023 values)
@@ -52,9 +54,9 @@ class accel:
 
         def measure(self, phys_state):
                 state = accel.noise(self)
-                state.x = (-math.sin(phys_state.x)*gravity)*26.122+512
-                state.y = math.cos(phys_state.x)*math.sin(phys_state.y)*gravity*26.122+512
-                state.z = math.cos(phys_state.x)*math.cos(phys_state.y)*gravity*26.122+512
+                state.x += (-math.sin(phys_state.x)*gravity)*26.122+512
+                state.y += math.cos(phys_state.x)*math.sin(phys_state.y)*gravity*26.122+512
+                state.z += math.cos(phys_state.x)*math.cos(phys_state.y)*gravity*26.122+512
                 return state
 
         def scale(self):
