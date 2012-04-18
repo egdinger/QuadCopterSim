@@ -109,9 +109,10 @@ class imu_model:
 class QuadCopter:
 	#units are grams
 	mass = 1000
-	thrust_rpm = .1225 #this is thrust per rpm
+	#thrust_rpm = .1225 #this is thrust per rpm
 	num_motors = 4
 	max_motor_speed = 10212
+	thrust_rpm = 7.6972/max_motor_speed # This is in newtons
 
 	#since python sin uses radins, these are in radians
 	#This is the physical state of the airframe
@@ -139,17 +140,17 @@ class QuadCopter:
 
 x = [.1,.2,.3,.4,.5,.6,.7,.8,.9,1]
 
-##for p in x:
-##        z = [p,p,p,p]
-##        print (QuadCopter.thrust(z, QuadCopter))
-##
-##QuadCopter.phys_state.roll = .1
-##print('------------------------------------------------')
-##print(QuadCopter.phys_state.roll)
-##for p in x:
-##        z = [p,p,p,p]
-##        print (QuadCopter.thrust(z, QuadCopter))
-##
+for p in x:
+        z = [p,p,p,p]
+        print (QuadCopter.thrust(z, QuadCopter))
+
+QuadCopter.phys_state.roll = .2
+print('------------------------------------------------')
+print(QuadCopter.phys_state.roll)
+for p in x:
+        z = [p,p,p,p]
+        print (QuadCopter.thrust(z, QuadCopter))
+
 ##print('------------------------------------------------')
 ##a= accel()
 ##QuadCopter.phys_state.roll = 0
