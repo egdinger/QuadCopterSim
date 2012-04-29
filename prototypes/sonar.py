@@ -18,7 +18,7 @@ class sonar:
     def measure(self):
         return (self.height + gauss(self.noise_mu, self.noise_sigma))
 
-test = sonar(0,1)
+test = sonar(0,.2)
 ts = state()
 
 for j in range(0,10,2):
