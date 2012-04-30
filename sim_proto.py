@@ -117,23 +117,36 @@ class accelerometer(sensor):
         grav_vector.z = t_dcm[2][2]
         return grav_vector
 
-#class rate_gyro(sensor): #need to do this...
+class rate_gyro(sensor):
+    def __init__(self, name, mu, sigma):
+        sensor.__init__(self, name, mu, sigma)
+        self.psi = 0
+        self.phi = 0
+        self.theta = 0
+    def update(self, physical_state):
+        self.phi =  physical_state.angle_velocity.x
+        self.theta = physical_state.angle_velocity.y
+        self.psi = physical_state.angle_velocity.z
+    def measure(self):
+        #not really not done, no noise!
+        return [self.phi, self.theta, self.psi]
 
 class inertial_measurement_unit():
     def __init__(self):
         self.accel = accelerometer('adxl 345', adxl345_mu, adxl345_sigma)
-        #self.gyro = rate_gyro('itg3200', itg3200_mu, itg3200_sigma)
+        self.gyro = rate_gyro('itg3200', itg3200_mu, itg3200_sigma)
         self.height = sonar('maxbotixs', sonar_mu, sonar_sigma)
     def update(self, physical_state):
         self.accel.update(physical_state)
-        #self.gyro.update(physical_state)
+        self.gyro.update(physical_state)
         self.height.update(physical_state)
     #returns all the values of the sensors in the imu,
     #The format is an array containg the 3 gyro values, followed by the 3 accel values, followed by the height sensor value
     def measure(self):
+        gy = self.gyro.measure()
         acc = self.accel.measure()
         h = self.height.measure()
-        return [0,0,0,acc.x,acc.y,acc.z,h]
+        return [gy[0],gy[1],gy[2],acc.x,acc.y,acc.z,h]
 
 #These are the various physics calculations that are used by the quadcopter, roll these into the quadcopter class?
 def lin_drag(Cd, area, velocity):
@@ -172,13 +185,13 @@ def update_physical_state(physical_state):
     physical_state.position.z += physical_state.velocity.z
 
     #update the rotation values, again dumb integration
-    physical_state.rot_velocity.x += x_rot_accel
-    physical_state.rot_velocity.y += y_rot_accel
-    physical_state.rot_velocity.z += z_rot_accel
+    physical_state.angle_velocity.x += x_rot_accel
+    physical_state.angle_velocity.y += y_rot_accel
+    physical_state.angle_velocity.z += z_rot_accel
 
-    physical_state.angle.x = physical_state.rot_velocity.x
-    physical_state.angle.y = physical_state.rot_velocity.y
-    physical_state.angle.z = physical_state.rot_velocity.z
+    physical_state.angle.x = physical_state.angle_velocity.x
+    physical_state.angle.y = physical_state.angle_velocity.y
+    physical_state.angle.z = physical_state.angle_velocity.z
 
 def load_command_file(file, delta_conversion):
     command_data = numpy.loadtxt(file, delimiter=',')
@@ -208,9 +221,25 @@ class QuadCopterModel():
         self.position = quad_state()
     def position(self):
         return self.position
+    def sensor_filter(imu_state):
+        #This is a placeholder currently
+        return imu_state
+        
+    def state_update(self):
+        imu_state = self.imu.measure()
+        #sensor_filter(imu_state)
+        self.position.roll += imu_state[0]
+        self.position.pitch += imu_state[1]
+        self.position.yaw += imu_state[2]
+
+    def control_update(self):
+        motor_state = [0,0,0,0]
+        
     def update(self, physical_state):
-        self.imu.update(physicale_state)
-        self.imu.measure()
+        self.imu.update(physical_state)
+        self.state_update()
+        self.control_update()
+        
     def set_setpoint(self,new_setpoint):
         self.setpoint = new_setpoint
 
@@ -230,4 +259,7 @@ if __name__ == '__main__':
             print (QC.setpoint)
             if command < len(command_array-1):
                 command += 1
+
+        force = QC.update(world)
+        update_physical_state(world)
         time += delta_t
