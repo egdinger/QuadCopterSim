@@ -1,5 +1,8 @@
 from random import *
 import numpy, math
+import matplotlib as mpl
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt1
 #These are constants that need to be set for each quadcopter
 mass = 1.2
 CodX = 1.04 #Coefficient of Drag on the x axis
@@ -20,7 +23,8 @@ motor_num = 4 #The number of motors on the quadcopter
 p = 1.225 #density of air
 g = 9.81 #Gravity
 delta_t = 1 #in 100th's of a second
-run_time = 5 * 100
+inverse_delta = 100
+run_time = 5 * inverse_delta
 
 #These are sensor constants
 adxl345_mu = 0
@@ -157,41 +161,44 @@ def lin_accel(force, velocity, area, Cd):
 
 def rot_drag(Cd, area, velocity):
     #Need to figure this out, talked w/Greg, integral of the velocity over the radius?
-    return 7
+    return 0
 
-def rot_accel(torque, rot_vel, area, Cd, I):
-    return (torque - rot_drag)/I
+def torque(force, r):
+    return (r * force * 1) #This is the radius * force * the sin of the angle that the force is applied with, in our case this is 90 degrees so we just make it 1
+
+def rot_accel(force, rot_vel, area, Cd, I):
+    return (torque(force, arm_length) - rot_drag(Cd, area, rot_vel))/I
 
 def update_physical_state(physical_state):
     #calculate the force on each axis
     #on the x axis caculate the linear and rot accel
-    x_accel = 0
-    x_rot_accel = 0
+    x_accel = lin_accel(10, physical_state.velocity.x, Ax, CodX)
+    x_rot_accel = rot_accel(0, physical_state.angle_velocity.x, Ax, CodX, Ix)
     #on the y axis caculate the linear and rot accel
-    y_accel = 0
-    y_rot_accel = 0
+    y_accel = lin_accel(0, physical_state.velocity.y, Ay, CodY)
+    y_rot_accel = rot_accel(10, physical_state.angle_velocity.y, Ay, CodY, Iy)
     #on the z axis caculate the linear and rot accel
-    z_accel = 0
-    z_rot_accel = 0
+    z_accel = lin_accel(10, physical_state.velocity.z, Az, CodZ)
+    z_rot_accel = rot_accel(10, physical_state.angle_velocity.z, Az, CodZ, Iz)
 
     #Integrate the velocity and position values, just do dumb integration for now, look into better methods.
-    physical_state.velocity.x += x_accel
-    physical_state.velocity.y += y_accel
-    physical_state.velocity.z += z_accel
+    physical_state.velocity.x += x_accel/inverse_delta
+    physical_state.velocity.y += y_accel/inverse_delta
+    physical_state.velocity.z += z_accel/inverse_delta
 
     #Should I update this before the velocity?
-    physical_state.position.x += physical_state.velocity.x
-    physical_state.position.y += physical_state.velocity.y
-    physical_state.position.z += physical_state.velocity.z
+    physical_state.position.x += physical_state.velocity.x/inverse_delta
+    physical_state.position.y += physical_state.velocity.y/inverse_delta
+    physical_state.position.z += physical_state.velocity.z/inverse_delta
 
     #update the rotation values, again dumb integration
-    physical_state.angle_velocity.x += x_rot_accel
-    physical_state.angle_velocity.y += y_rot_accel
-    physical_state.angle_velocity.z += z_rot_accel
+    physical_state.angle_velocity.x += x_rot_accel/inverse_delta
+    physical_state.angle_velocity.y += y_rot_accel/inverse_delta
+    physical_state.angle_velocity.z += z_rot_accel/inverse_delta
 
-    physical_state.angle.x = physical_state.angle_velocity.x
-    physical_state.angle.y = physical_state.angle_velocity.y
-    physical_state.angle.z = physical_state.angle_velocity.z
+    physical_state.angle.x = physical_state.angle_velocity.x/inverse_delta
+    physical_state.angle.y = physical_state.angle_velocity.y/inverse_delta
+    physical_state.angle.z = physical_state.angle_velocity.z/inverse_delta
 
 def load_command_file(file, delta_conversion):
     command_data = numpy.loadtxt(file, delimiter=',')
@@ -219,8 +226,11 @@ class QuadCopterModel():
         self.thrust_per_rpm = self.motor_thrust/motor_max_rpm
         self.setpoint = quad_state()
         self.position = quad_state()
+        self.motor_val = [0,0,0,0]
+        
     def position(self):
         return self.position
+    
     def sensor_filter(imu_state):
         #This is a placeholder currently
         return imu_state
@@ -228,9 +238,9 @@ class QuadCopterModel():
     def state_update(self):
         imu_state = self.imu.measure()
         #sensor_filter(imu_state)
-        self.position.roll += imu_state[0]
-        self.position.pitch += imu_state[1]
-        self.position.yaw += imu_state[2]
+        self.position.roll += imu_state[0]/inverse_delta
+        self.position.pitch += imu_state[1]/inverse_delta
+        self.position.yaw += imu_state[2]/inverse_delta
 
     def control_update(self):
         motor_state = [0,0,0,0]
@@ -244,6 +254,18 @@ class QuadCopterModel():
         self.setpoint = new_setpoint
 
 if __name__ == '__main__':
+    #setup stuff for the graphs to display
+    mpl.rcParams['legend.fontsize'] = 10
+
+    fig = plt1.figure()
+    ax = fig.gca(projection='3d')
+    theta = numpy.linspace(-4 * numpy.pi, 4 * numpy.pi, 100)
+    z = []
+    x = []
+    y = []
+    ax.legend()
+
+    #Setup stuff for quadcopter and initializing the world
     print ('Start')
     world = physical_state()
     time = 0
@@ -262,4 +284,13 @@ if __name__ == '__main__':
 
         force = QC.update(world)
         update_physical_state(world)
+        #Here is where we add whatever data we want to the graphs
+        x.append(world.position.x)
+        y.append(world.position.y)
+        z.append(world.position.z)
+
+        #Increment the time
         time += delta_t
+
+    ax.plot(x, y, z, label='parametric curve')
+    plt1.show()
