@@ -3,6 +3,7 @@ import numpy, math
 import matplotlib as mpl
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt1
+import pdb
 #These are constants that need to be set for each quadcopter
 mass = 1.2
 CodX = 1.04 #Coefficient of Drag on the x axis
@@ -16,7 +17,8 @@ Ix = 1 #Inertia on the x axis
 Iy = 1 #Inertia on the y axis
 Iz = 1 #Inertia on the z axis
 motor_max_thrust = 7.6972 #thrust in newtons of one motor
-motor_max_rpm = 10212 #The max rpm of the motors, note in this case it's over the max rpm of the props 
+motor_max_rpm = 10212 #The max rpm of the motors, note in this case it's over the max rpm of the props
+mmam = 7.6972/100
 motor_num = 4 #The number of motors on the quadcopter
 
 #These are constants that are set for the environment
@@ -24,7 +26,7 @@ p = 1.225 #density of air
 g = 9.81 #Gravity
 delta_t = 1 #in 100th's of a second
 inverse_delta = 100
-run_time = 5 * inverse_delta
+run_time = 6.5 * inverse_delta
 
 #These are sensor constants
 adxl345_mu = 0
@@ -98,7 +100,7 @@ class sonar(sensor):
         self.distance = physical_state.position.z
     def measure(self):
         return self.noise() + self.distance
-        
+
 class accelerometer(sensor):
     def __init__(self, name, mu, sigma):
         sensor.__init__(self, name, mu, sigma)
@@ -161,7 +163,8 @@ def lin_accel(force, velocity, area, Cd):
 
 def rot_drag(Cd, area, velocity):
     #Need to figure this out, talked w/Greg, integral of the velocity over the radius?
-    return 0
+    #Going to use lin_drag for now
+    return lin_drag(Cd, area, velocity)
 
 def torque(force, r):
     return (r * force * 1) #This is the radius * force * the sin of the angle that the force is applied with, in our case this is 90 degrees so we just make it 1
@@ -169,17 +172,34 @@ def torque(force, r):
 def rot_accel(force, rot_vel, area, Cd, I):
     return (torque(force, arm_length) - rot_drag(Cd, area, rot_vel))/I
 
-def update_physical_state(physical_state):
+def update_physical_state(physical_state, motor_state):
+    #pdb.set_trace()
+    #linear force is (m1 + m2) * sin(angle)
+    x_force = (motor_state[0] + motor_state[2]) * math.sin(physical_state.angle.x) * motor_max_thrust
+
+    y_force = (motor_state[1] + motor_state[3]) * math.sin(physical_state.angle.y) * motor_max_thrust
+
+    z_force = (motor_state[0] + motor_state[1] + motor_state[2] + motor_state[3])* motor_max_thrust
+
+    print (physical_state.angle.x,physical_state.angle.y,physical_state.angle.z)
+    print (x_force, y_force, z_force)
+    #rotational force is (m1 - m2)
+    x_rot_force = (motor_state[0] - motor_state[2])
+    y_rot_force = (motor_state[1] + motor_state[3])
+    z_rot_force = (motor_state[0] + motor_state[2]) - (motor_state[1] + motor_state[3])
     #calculate the force on each axis
     #on the x axis caculate the linear and rot accel
     x_accel = lin_accel(10, physical_state.velocity.x, Ax, CodX)
-    x_rot_accel = rot_accel(0, physical_state.angle_velocity.x, Ax, CodX, Ix)
+    x_rot_accel = rot_accel(x_rot_force, physical_state.angle_velocity.x, Ax, CodX, Ix)
     #on the y axis caculate the linear and rot accel
-    y_accel = lin_accel(0, physical_state.velocity.y, Ay, CodY)
-    y_rot_accel = rot_accel(10, physical_state.angle_velocity.y, Ay, CodY, Iy)
+    y_accel = lin_accel(y_force, physical_state.velocity.y, Ay, CodY)
+    y_rot_accel = rot_accel(y_rot_force, physical_state.angle_velocity.y, Ay, CodY, Iy)
     #on the z axis caculate the linear and rot accel
-    z_accel = lin_accel(10, physical_state.velocity.z, Az, CodZ)
-    z_rot_accel = rot_accel(10, physical_state.angle_velocity.z, Az, CodZ, Iz)
+    z_accel = lin_accel(z_force, physical_state.velocity.z, Az, CodZ) + -g
+    if (z_accel < 0 and physical_state.position.z <= 0):
+        z_accel = 0
+        physical_state.position.z = 0
+    z_rot_accel = rot_accel(z_rot_force, physical_state.angle_velocity.z, Az, CodZ, Iz)
 
     #Integrate the velocity and position values, just do dumb integration for now, look into better methods.
     physical_state.velocity.x += x_accel/inverse_delta
@@ -216,7 +236,7 @@ def command_to_setpoint(command):
     tmp_setpoint.y = command[5]
     tmp_setpoint.z = command[6]
     return tmp_setpoint
-    
+
 
 class QuadCopterModel():
     def __init__(self):
@@ -227,14 +247,14 @@ class QuadCopterModel():
         self.setpoint = quad_state()
         self.position = quad_state()
         self.motor_val = [0,0,0,0]
-        
+
     def position(self):
         return self.position
-    
+
     def sensor_filter(imu_state):
         #This is a placeholder currently
         return imu_state
-        
+
     def state_update(self):
         imu_state = self.imu.measure()
         #sensor_filter(imu_state)
@@ -243,13 +263,15 @@ class QuadCopterModel():
         self.position.yaw += imu_state[2]/inverse_delta
 
     def control_update(self):
-        motor_state = [0,0,0,0]
-        
+        for i in list(range(len(self.motor_val))):
+            self.motor_val[i] = self.setpoint.z
+        return self.motor_val
+
     def update(self, physical_state):
         self.imu.update(physical_state)
         self.state_update()
-        self.control_update()
-        
+        return self.control_update()
+
     def set_setpoint(self,new_setpoint):
         self.setpoint = new_setpoint
 
@@ -278,12 +300,12 @@ if __name__ == '__main__':
     while (time <= run_time):
         if command_array[command][0] <= time:
             QC.set_setpoint(command_to_setpoint(command_array[command]))
-            print (QC.setpoint)
+            print (str(time) + ":" + str(QC.setpoint))
             if command < len(command_array-1):
                 command += 1
 
-        force = QC.update(world)
-        update_physical_state(world)
+        motor_state = QC.update(world)
+        update_physical_state(world, motor_state)
         #Here is where we add whatever data we want to the graphs
         x.append(world.position.x)
         y.append(world.position.y)
