@@ -185,7 +185,7 @@ def update_physical_state(physical_state, motor_state):
     print (x_force, y_force, z_force)
     #rotational force is (m1 - m2)
     x_rot_force = (motor_state[0] - motor_state[2])
-    y_rot_force = (motor_state[1] + motor_state[3])
+    y_rot_force = (motor_state[1] - motor_state[3])
     z_rot_force = (motor_state[0] + motor_state[2]) - (motor_state[1] + motor_state[3])
     #calculate the force on each axis
     #on the x axis caculate the linear and rot accel
